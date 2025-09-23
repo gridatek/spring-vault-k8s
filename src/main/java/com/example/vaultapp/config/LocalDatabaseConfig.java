@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Profile;
 import javax.sql.DataSource;
 
 @Configuration
-@Profile("!local")
-public class DatabaseConfig {
+@Profile("local")
+public class LocalDatabaseConfig {
 
     @Value("${spring.datasource.url}")
     private String url;
@@ -19,7 +19,7 @@ public class DatabaseConfig {
     @Value("${spring.datasource.username}")
     private String username;
 
-    @Value("${database.password}")
+    @Value("${spring.datasource.password}")
     private String password;
 
     @Bean
