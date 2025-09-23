@@ -145,10 +145,21 @@ jobs:
 
     - name: Deploy to Kubernetes
       run: |
-        # Apply namespace first and wait for it to be ready
+        # Apply namespace first and give it a moment to be ready
         echo "Creating namespace..."
         kubectl apply -f k8s/namespace.yaml
-        kubectl wait --for=condition=Active namespace/vault-app --timeout=60s
+        
+        # Check namespace status
+        echo "Checking namespace status..."
+        kubectl get namespace vault-app -o yaml || echo "Namespace not found yet"
+        
+        # Simple sleep instead of complex wait
+        echo "Waiting for namespace to be ready..."
+        sleep 10
+        
+        # Verify namespace is available
+        kubectl get namespace vault-app
+        echo "Namespace ready, proceeding with resources..."
         
         # Apply RBAC and other cluster-level resources
         echo "Applying RBAC and cluster resources..."
