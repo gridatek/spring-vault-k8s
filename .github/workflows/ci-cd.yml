@@ -103,10 +103,24 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Check available image tags
+      run: |
+        echo "Checking if image exists..."
+        if docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} >/dev/null 2>&1; then
+          echo "Image found with SHA tag"
+        else
+          echo "Image with SHA tag not found, checking available tags..."
+          # Try to list available tags (this might not work with private registries)
+          docker search ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} || echo "Cannot list tags"
+        fi
+
     - name: Load Docker image to Kind
       run: |
+        echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
         docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+        echo "Loading image into Kind cluster..."
         kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} --name vault-app-cluster
+        echo "Image loaded successfully"
 
     - name: Deploy to Kubernetes
       run: |
