@@ -186,7 +186,17 @@ jobs:
         
         # Wait for deployment to be ready
         echo "Waiting for deployment to be ready..."
-        kubectl rollout status deployment/vault-app -n vault-app --timeout=300s
+        kubectl rollout status deployment/vault-app -n vault-app --timeout=300s || {
+          echo "Deployment rollout timed out, checking pod status..."
+          kubectl get pods -n vault-app
+          echo "Describing vault-app pods..."
+          kubectl describe pods -l app=vault-app -n vault-app
+          echo "Checking vault-app pod logs..."
+          kubectl logs -l app=vault-app -n vault-app --tail=50 || echo "No logs available yet"
+          echo "Checking events in namespace..."
+          kubectl get events -n vault-app --sort-by='.lastTimestamp'
+          exit 1
+        }
 
     - name: Run end-to-end tests
       run: |
