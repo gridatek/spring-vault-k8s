@@ -1,4 +1,4 @@
-FROM openjdk:17-jdk-slim as builder
+FROM eclipse-temurin:17-jdk-alpine as builder
 
 WORKDIR /app
 COPY mvnw .
@@ -9,9 +9,9 @@ RUN ./mvnw dependency:go-offline -B
 COPY src src
 RUN ./mvnw package -DskipTests
 
-FROM openjdk:17-jre-slim
+FROM eclipse-temurin:17-jre-alpine
 
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache curl
 
 WORKDIR /app
 COPY --from=builder /app/target/*.jar app.jar
