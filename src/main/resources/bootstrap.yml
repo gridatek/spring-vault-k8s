@@ -4,8 +4,11 @@ spring:
   cloud:
     vault:
       uri: http://vault:8200
-      authentication: TOKEN
-      token: myroot
+      authentication: KUBERNETES
+      kubernetes:
+        role: vault-app-role
+        kubernetes-path: kubernetes
+        service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
       kv:
         enabled: true
         backend: secret
