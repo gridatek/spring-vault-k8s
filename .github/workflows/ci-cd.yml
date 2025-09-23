@@ -192,7 +192,14 @@ jobs:
         # Fix the Vault deployment and delete old pods to force restart
         kubectl patch deployment vault -n vault-app -p '{"spec":{"template":{"spec":{"containers":[{"name":"vault","imagePullPolicy":"IfNotPresent"}]}}}}'
         kubectl delete pods -l app=vault -n vault-app || echo "No vault pods to delete"
+        
+        # Clean up old replica sets and pods for vault-app
+        echo "Cleaning up old replica sets..."
+        kubectl delete replicaset -l app=vault-app -n vault-app || echo "No old replica sets to delete"
         kubectl delete pods -l app=vault-app -n vault-app || echo "No vault-app pods to delete"
+        
+        # Wait for the deployment to stabilize
+        sleep 10
         
         # Wait for deployment to be ready
         echo "Waiting for deployment to be ready..."
@@ -202,7 +209,12 @@ jobs:
           echo "Describing vault-app pods..."
           kubectl describe pods -l app=vault-app -n vault-app
           echo "Checking vault-app pod logs..."
-          kubectl logs -l app=vault-app -n vault-app --tail=50 || echo "No logs available yet"
+          kubectl logs -l app=vault-app -n vault-app --tail=100 --previous=false || echo "No current logs available"
+          echo "Checking previous container logs if crashed..."
+          kubectl logs -l app=vault-app -n vault-app --tail=100 --previous=true || echo "No previous logs available"
+          echo "Checking Vault pod status..."
+          kubectl get pods -l app=vault -n vault-app
+          kubectl logs -l app=vault -n vault-app --tail=20 || echo "No Vault logs available"
           echo "Checking events in namespace..."
           kubectl get events -n vault-app --sort-by='.lastTimestamp'
           exit 1
