@@ -34,7 +34,7 @@ jobs:
       run: ./mvnw clean test
 
     - name: Run integration tests
-      run: ./mvnw clean verify -P integration-tests
+      run: ./mvnw verify
 
   build-and-push:
     needs: test
