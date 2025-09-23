@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+  cloud:
+    vault:
+      enabled: false
+
+database:
+  password: test-password
+
+logging:
+  level:
+    com.example.vaultapp: INFO
+    org.springframework.vault: INFO
+    org.springframework.cloud.vault: INFO

@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vault-app
+  namespace: vault-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: vault-app
+  template:
+    metadata:
+      labels:
+        app: vault-app
+    spec:
+      serviceAccountName: vault-app
+      containers:
+      - name: vault-app
+        image: vault-app:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: kubernetes
+        volumeMounts:
+        - name: vault-ca-cert
+          mountPath: /etc/ssl/certs
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+      volumes:
+      - name: vault-ca-cert
+        secret:
+          secretName: vault-ca-cert
