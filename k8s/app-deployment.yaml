@@ -22,10 +22,6 @@ spec:
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: kubernetes
-        volumeMounts:
-        - name: vault-ca-cert
-          mountPath: /etc/ssl/certs
-          readOnly: true
         livenessProbe:
           httpGet:
             path: /api/health
@@ -38,7 +34,3 @@ spec:
             port: 8080
           initialDelaySeconds: 30
           periodSeconds: 10
-      volumes:
-      - name: vault-ca-cert
-        secret:
-          secretName: vault-ca-cert

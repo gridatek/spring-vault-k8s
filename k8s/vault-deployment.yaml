@@ -29,6 +29,27 @@ spec:
           capabilities:
             add:
             - IPC_LOCK
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - sh
+              - -c
+              - |
+                # Wait for Vault to be ready
+                sleep 5
+                until vault status; do
+                  echo "Waiting for Vault to be ready..."
+                  sleep 2
+                done
+                
+                # Enable KV secrets engine (ignore if already enabled)
+                vault secrets enable -path=secret kv-v2 || echo "KV engine already enabled"
+                
+                # Create database password secret
+                vault kv put secret/vault-app database.password=supersecretpassword
+                
+                echo "Vault setup completed successfully!"
         command:
         - vault
         - server
