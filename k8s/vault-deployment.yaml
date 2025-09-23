@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: vault
-        image: vault:1.15.2
+        image: hashicorp/vault:1.15.2
         env:
         - name: VAULT_DEV_ROOT_TOKEN_ID
           value: myroot

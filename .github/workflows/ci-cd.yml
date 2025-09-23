@@ -141,7 +141,9 @@ jobs:
         docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
         echo "Loading image into Kind cluster..."
         kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} --name vault-app-cluster
-        echo "Image loaded successfully"
+        echo "Verifying image is loaded in Kind..."
+        docker exec vault-app-cluster-control-plane crictl images | grep spring-vault-k8s || echo "Image not found in Kind"
+        echo "Image loading completed"
 
     - name: Deploy to Kubernetes
       run: |
@@ -180,9 +182,17 @@ jobs:
         kubectl apply -f k8s/vault-deployment.yaml
         kubectl apply -f k8s/app-deployment.yaml
         
-        # Update the app deployment with the correct image
+        # Update the app deployment with the correct image and pull policy
         echo "Updating app deployment with image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
         kubectl set image deployment/vault-app vault-app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} -n vault-app
+        
+        # Set imagePullPolicy to Never since we loaded the image into Kind
+        kubectl patch deployment vault-app -n vault-app -p '{"spec":{"template":{"spec":{"containers":[{"name":"vault-app","imagePullPolicy":"Never"}]}}}}'
+        
+        # Fix the Vault deployment and delete old pods to force restart
+        kubectl patch deployment vault -n vault-app -p '{"spec":{"template":{"spec":{"containers":[{"name":"vault","imagePullPolicy":"IfNotPresent"}]}}}}'
+        kubectl delete pods -l app=vault -n vault-app || echo "No vault pods to delete"
+        kubectl delete pods -l app=vault-app -n vault-app || echo "No vault-app pods to delete"
         
         # Wait for deployment to be ready
         echo "Waiting for deployment to be ready..."
