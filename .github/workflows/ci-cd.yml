@@ -145,9 +145,37 @@ jobs:
 
     - name: Deploy to Kubernetes
       run: |
-        kubectl apply -f k8s/
+        # Apply namespace first and wait for it to be ready
+        echo "Creating namespace..."
+        kubectl apply -f k8s/namespace.yaml
+        kubectl wait --for=condition=Active namespace/vault-app --timeout=60s
+        
+        # Apply RBAC and other cluster-level resources
+        echo "Applying RBAC and cluster resources..."
+        kubectl apply -f k8s/vault-rbac.yaml
+        
+        # Apply storage resources
+        echo "Applying storage resources..."
+        kubectl apply -f k8s/postgres-pvc.yaml
+        
+        # Apply services (they can be created before deployments)
+        echo "Applying services..."
+        kubectl apply -f k8s/postgres-service.yaml
+        kubectl apply -f k8s/app-service.yaml
+        
+        # Apply deployments
+        echo "Applying deployments..."
+        kubectl apply -f k8s/postgres-deployment.yaml
+        kubectl apply -f k8s/vault-deployment.yaml
+        kubectl apply -f k8s/app-deployment.yaml
+        
+        # Update the app deployment with the correct image
+        echo "Updating app deployment with image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
         kubectl set image deployment/vault-app vault-app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} -n vault-app
-        kubectl rollout status deployment/vault-app -n vault-app
+        
+        # Wait for deployment to be ready
+        echo "Waiting for deployment to be ready..."
+        kubectl rollout status deployment/vault-app -n vault-app --timeout=300s
 
     - name: Run end-to-end tests
       run: |
