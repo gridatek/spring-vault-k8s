@@ -9,9 +9,8 @@ data:
     set -e
     
     echo "Waiting for Vault to be ready..."
-    export VAULT_ADDR="https://vault:8200"
+    export VAULT_ADDR="http://vault:8200"
     export VAULT_TOKEN="myroot"
-    export VAULT_SKIP_VERIFY="true"
     
     # Wait for Vault to be ready using vault status
     until vault status >/dev/null 2>&1; do

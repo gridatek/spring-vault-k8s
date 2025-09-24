@@ -3,15 +3,12 @@ spring:
     name: vault-app
   cloud:
     vault:
-      uri: https://vault:8200
+      uri: http://vault:8200
       authentication: KUBERNETES
       kubernetes:
         role: vault-app-role
         kubernetes-path: kubernetes
         service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
-      ssl:
-        trust-store: file:/etc/ssl/certs/vault-cert.pem
-        trust-store-type: PEM
       kv:
         enabled: true
         backend: secret
