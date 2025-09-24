@@ -191,30 +191,71 @@ jobs:
       run: |
         set -e  # Exit on any error
         
+        echo "=== Validating cluster connectivity ==="
+        kubectl cluster-info
+        kubectl get nodes
+        
+        echo "=== Validating manifest files ==="
+        ls -la k8s/
+        for file in k8s/*.yaml; do
+          echo "Checking $file..."
+          kubectl apply --dry-run=client -f "$file" || echo "Warning: $file has validation issues"
+        done
+        
         echo "=== Creating namespace ==="
         kubectl apply -f k8s/namespace.yaml
         kubectl wait --for=condition=Ready namespace/vault-app --timeout=60s
         
         echo "=== Applying RBAC resources ==="
-        kubectl apply -f k8s/vault-rbac.yaml
+        kubectl apply -f k8s/vault-rbac.yaml || {
+          echo "Failed to apply RBAC resources, checking details..."
+          kubectl get clusterrolebindings | grep vault || echo "No vault clusterrolebindings found"
+          exit 1
+        }
         
         echo "=== Creating secrets ==="
-        kubectl apply -f k8s/vault-certs-secret.yaml
+        kubectl apply -f k8s/vault-certs-secret.yaml || {
+          echo "Failed to apply secrets, checking namespace..."
+          kubectl get namespace vault-app || echo "Namespace not found"
+          exit 1
+        }
         
         echo "=== Creating storage resources ==="
-        kubectl apply -f k8s/postgres-pvc.yaml
+        kubectl apply -f k8s/postgres-pvc.yaml || {
+          echo "Failed to apply PVC, checking storage classes..."
+          kubectl get storageclass || echo "No storage classes available"
+          exit 1
+        }
         
         echo "=== Creating services ==="
         kubectl apply -f k8s/postgres-service.yaml
         kubectl apply -f k8s/app-service.yaml
         
         echo "=== Deploying PostgreSQL ==="
-        kubectl apply -f k8s/postgres-deployment.yaml
-        kubectl wait --for=condition=available deployment/postgres -n vault-app --timeout=300s
+        kubectl apply -f k8s/postgres-deployment.yaml || {
+          echo "Failed to apply PostgreSQL deployment"
+          kubectl describe deployment postgres -n vault-app || echo "No postgres deployment found"
+          exit 1
+        }
+        kubectl wait --for=condition=available deployment/postgres -n vault-app --timeout=300s || {
+          echo "PostgreSQL deployment not ready, checking status..."
+          kubectl get pods -l app=postgres -n vault-app
+          kubectl describe pods -l app=postgres -n vault-app
+          exit 1
+        }
         
         echo "=== Deploying Vault ==="
-        kubectl apply -f k8s/vault-deployment.yaml
-        kubectl wait --for=condition=available deployment/vault -n vault-app --timeout=300s
+        kubectl apply -f k8s/vault-deployment.yaml || {
+          echo "Failed to apply Vault deployment"
+          kubectl describe deployment vault -n vault-app || echo "No vault deployment found"
+          exit 1
+        }
+        kubectl wait --for=condition=available deployment/vault -n vault-app --timeout=300s || {
+          echo "Vault deployment not ready, checking status..."
+          kubectl get pods -l app=vault -n vault-app
+          kubectl describe pods -l app=vault -n vault-app
+          exit 1
+        }
         
         # Wait for Vault to be ready and initialize
         echo "Waiting for Vault to be ready..."
