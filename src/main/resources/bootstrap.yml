@@ -10,8 +10,8 @@ spring:
         kubernetes-path: kubernetes
         service-account-token-file: /var/run/secrets/kubernetes.io/serviceaccount/token
       ssl:
-        trust-store: file:/etc/ssl/certs/vault-ca.pem
-        trust-store-password: changeit
+        trust-store: file:/etc/ssl/certs/vault-cert.pem
+        trust-store-type: PEM
       kv:
         enabled: true
         backend: secret
@@ -20,4 +20,4 @@ spring:
       config:
         order: -10
       fail-fast: true
-      timeout: 5s
+      timeout: 10s

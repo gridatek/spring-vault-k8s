@@ -23,9 +23,17 @@ spec:
         - name: VAULT_DEV_LISTEN_ADDRESS
           value: 0.0.0.0:8200
         - name: VAULT_ADDR
-          value: http://127.0.0.1:8200
+          value: https://127.0.0.1:8200
+        - name: VAULT_DEV_TLS_CERT_FILE
+          value: /vault/certs/vault-cert.pem
+        - name: VAULT_DEV_TLS_KEY_FILE
+          value: /vault/certs/vault-key.pem
         ports:
         - containerPort: 8200
+        volumeMounts:
+        - name: vault-certs
+          mountPath: /vault/certs
+          readOnly: true
         resources:
           requests:
             memory: "256Mi"

@@ -9,14 +9,17 @@ data:
     set -e
     
     echo "Waiting for Vault to be ready..."
-    until curl -f http://vault:8200/v1/sys/health; do
+    export VAULT_ADDR="https://vault:8200"
+    export VAULT_TOKEN="myroot"
+    export VAULT_SKIP_VERIFY="true"
+    
+    # Wait for Vault to be ready using vault status
+    until vault status >/dev/null 2>&1; do
       echo "Vault not ready, waiting..."
       sleep 5
     done
     
     echo "Vault is ready, configuring..."
-    export VAULT_ADDR="http://vault:8200"
-    export VAULT_TOKEN="myroot"
     
     # Enable KV secrets engine (ignore if already enabled)
     vault secrets enable -path=secret kv-v2 || echo "KV engine already enabled"
