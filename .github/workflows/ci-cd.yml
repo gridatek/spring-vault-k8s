@@ -149,18 +149,9 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Kind cluster
-      uses: helm/kind-action@v1.10.0
+      uses: helm/kind-action@v1.8.0
       with:
         cluster_name: vault-app-cluster
-        config: |
-          kind: Cluster
-          apiVersion: kind.x-k8s.io/v1alpha4
-          nodes:
-          - role: control-plane
-            extraPortMappings:
-            - containerPort: 30080
-              hostPort: 8080
-              protocol: TCP
 
     - name: Log in to Container Registry
       uses: docker/login-action@v3
@@ -171,20 +162,54 @@ jobs:
 
     - name: Get image tag from build job
       run: |
-        echo "Using image tag from metadata output"
-        echo "IMAGE_TAG=sha-$(echo ${{ github.sha }} | cut -c1-7)" >> $GITHUB_ENV
+        echo "Available environment variables:"
+        echo "GITHUB_SHA: ${{ github.sha }}"
+        echo "GITHUB_REF: ${{ github.ref }}"
+        echo "Repository: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+        
+        # Use the same tag format as the build job
+        IMAGE_TAG="sha-$(echo ${{ github.sha }} | cut -c1-7)"
+        echo "IMAGE_TAG=${IMAGE_TAG}" >> $GITHUB_ENV
+        echo "Using image tag: ${IMAGE_TAG}"
 
     - name: Pull and load Docker image to Kind
       run: |
         echo "Pulling image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
-        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}
+        
+        # Check if image exists first
+        if ! docker manifest inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}; then
+          echo "❌ Image not found in registry, checking available tags..."
+          echo "Registry: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "Expected tag: ${IMAGE_TAG}"
+          echo "Trying to list available images..."
+          docker search ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }} || echo "Cannot search registry"
+          exit 1
+        fi
+        
+        docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} || {
+          echo "❌ Failed to pull image"
+          docker images | grep vault-app || echo "No local vault-app images"
+          exit 1
+        }
+        
         echo "Loading image into Kind cluster..."
-        kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} --name vault-app-cluster
+        kind load docker-image ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} --name vault-app-cluster || {
+          echo "❌ Failed to load image into Kind"
+          kind get clusters
+          docker exec vault-app-cluster-control-plane crictl images || echo "Cannot list images in cluster"
+          exit 1
+        }
         
         # Verify cluster and image
+        echo "✅ Verifying cluster connectivity..."
         kubectl cluster-info
-        docker exec vault-app-cluster-control-plane crictl images | grep vault-app || echo "Checking all images in cluster..."
-        docker exec vault-app-cluster-control-plane crictl images
+        kubectl get nodes
+        
+        echo "✅ Verifying image is loaded..."
+        docker exec vault-app-cluster-control-plane crictl images | grep vault-app || {
+          echo "Image not found in cluster, checking all images..."
+          docker exec vault-app-cluster-control-plane crictl images
+        }
 
 
     - name: Deploy to Kubernetes
