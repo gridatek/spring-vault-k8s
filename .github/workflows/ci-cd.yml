@@ -221,11 +221,12 @@ jobs:
         sleep 30
         
         echo "=== Deploying application ==="
-        # Update image in deployment manifest before applying
-        sed -i "s|image: .*vault-app.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}|g" k8s/app-deployment.yaml
-        sed -i "s|imagePullPolicy: .*|imagePullPolicy: Never|g" k8s/app-deployment.yaml
-        
+        # First apply the base deployment
         kubectl apply -f k8s/app-deployment.yaml
+        
+        # Then update the image and pull policy
+        kubectl set image deployment/vault-app vault-app=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} -n vault-app
+        kubectl patch deployment vault-app -n vault-app -p '{"spec":{"template":{"spec":{"containers":[{"name":"vault-app","imagePullPolicy":"Never"}]}}}}'
         
         echo "=== Waiting for application deployment ==="
         kubectl rollout status deployment/vault-app -n vault-app --timeout=600s
@@ -308,15 +309,31 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Run security scan
-      uses: securecodewarrior/github-action-add-sarif@v1
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
       with:
-        sarif-file: 'security-scan-results.sarif'
-      continue-on-error: true
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Cache Maven packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
     
     - name: Dependency vulnerability scan
       run: |
-        ./mvnw org.owasp:dependency-check-maven:check || echo "Vulnerability scan completed with warnings"
+        echo "Running OWASP dependency check..."
+        ./mvnw org.owasp:dependency-check-maven:check -DskipTests || echo "Vulnerability scan completed with warnings"
+        
+    - name: Upload security scan results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: security-scan-results
+        path: target/dependency-check-report.html
+        retention-days: 30
 
   notify-status:
     needs: [test, code-quality, build-and-push, deploy]
