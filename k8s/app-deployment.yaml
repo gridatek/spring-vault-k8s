@@ -4,7 +4,7 @@ metadata:
   name: vault-app
   namespace: vault-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: vault-app
@@ -22,6 +22,13 @@ spec:
         env:
         - name: SPRING_PROFILES_ACTIVE
           value: kubernetes
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
         volumeMounts:
         - name: vault-ca-cert
           mountPath: /etc/ssl/certs
@@ -30,14 +37,18 @@ spec:
           httpGet:
             path: /api/health
             port: 8080
-          initialDelaySeconds: 60
+          initialDelaySeconds: 120
           periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /api/health
             port: 8080
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
       volumes:
       - name: vault-ca-cert
         secret:

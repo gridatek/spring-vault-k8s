@@ -23,65 +23,37 @@ spec:
         - name: VAULT_DEV_LISTEN_ADDRESS
           value: 0.0.0.0:8200
         - name: VAULT_ADDR
-          value: https://0.0.0.0:8200
-        - name: VAULT_DEV_TLS_CERT_FILE
-          value: /vault/certs/vault-cert.pem
-        - name: VAULT_DEV_TLS_KEY_FILE
-          value: /vault/certs/vault-key.pem
+          value: http://127.0.0.1:8200
         ports:
         - containerPort: 8200
-        volumeMounts:
-        - name: vault-certs
-          mountPath: /vault/certs
-          readOnly: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "250m"
         securityContext:
           capabilities:
             add:
             - IPC_LOCK
-        lifecycle:
-          postStart:
-            exec:
-              command:
-              - sh
-              - -c
-              - |
-                # Wait for Vault to be ready
-                sleep 5
-                until vault status; do
-                  echo "Waiting for Vault to be ready..."
-                  sleep 2
-                done
-                
-                # Enable KV secrets engine (ignore if already enabled)
-                vault secrets enable -path=secret kv-v2 || echo "KV engine already enabled"
-                
-                # Create database password secret
-                vault kv put secret/vault-app database.password=supersecretpassword
-                
-                # Enable Kubernetes auth method
-                vault auth enable kubernetes || echo "Kubernetes auth already enabled"
-                
-                # Configure Kubernetes auth method
-                vault write auth/kubernetes/config \
-                    token_reviewer_jwt="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)" \
-                    kubernetes_host="https://$KUBERNETES_PORT_443_TCP_ADDR:443" \
-                    kubernetes_ca_cert=@/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-                
-                # Create policy for the application
-                vault policy write vault-app-policy - <<EOF
-                path "secret/data/vault-app/*" {
-                  capabilities = ["read"]
-                }
-                EOF
-                
-                # Create a role for the application
-                vault write auth/kubernetes/role/vault-app-role \
-                    bound_service_account_names=vault-app \
-                    bound_service_account_namespaces=vault-app \
-                    policies=vault-app-policy \
-                    ttl=24h
-                
-                echo "Vault setup completed successfully!"
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health
+            port: 8200
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: /v1/sys/health
+            port: 8200
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
         command:
         - vault
         - server
